@@ -167,9 +167,10 @@ def compress_video(src: Path, dst: Path, ffmpeg_bin: str) -> bool:
     log("🎬 Compressione video...")
     cmd = [
         ffmpeg_bin, "-y", "-i", str(src),
-        "-c:v", "hevc_videotoolbox", "-b:v", "2M",
-        "-c:a", "aac", "-b:a", "64k",
+        "-c:v", "hevc_videotoolbox", "-b:v", "5M",
+        "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
+        "-tag:v", "hvc1",
         str(dst)
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
