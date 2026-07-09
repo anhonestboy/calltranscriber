@@ -27,6 +27,10 @@ python3 calltranscriber.py
 pip3 install pyinstaller
 ./build.sh
 # → dist/CallTranscriber.app
+
+# Install
+cp -r dist/CallTranscriber.app /Applications/
+xattr -dr com.apple.quarantine /Applications/CallTranscriber.app  # Gatekeeper
 ```
 
 First run downloads the whisper model (~1.5 GB) to `~/.calltranscriber/models/`.
