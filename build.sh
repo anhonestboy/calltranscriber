@@ -47,6 +47,7 @@ pyinstaller \
     --name "$APP_NAME" \
     --icon icon.icns \
     --add-data "icon.png:." \
+    --add-data "icon_processing.png:." \
     --osx-bundle-identifier com.calltranscriber.app \
     --clean \
     calltranscriber.py

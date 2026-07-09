@@ -1,63 +1,62 @@
 #!/usr/bin/env python3
-"""Genera un'icona PNG 512×512 per CallTranscriber."""
-import sys
+"""Genera le icone per CallTranscriber — idle e processing."""
 from PIL import Image, ImageDraw
+import sys, os
 
-size = 1024  # retina
-img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-draw = ImageDraw.Draw(img)
+OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 
-# Sfondo: cerchio gradiente blu (approssimato con cerchi concentrici)
-center = size // 2
-for i in range(center - 20, 0, -1):
-    r = int(25 + (200 - 25) * (i / (center - 20)))
-    g = int(60 + (180 - 60) * (i / (center - 20)))
-    b = int(170 + (255 - 170) * (i / (center - 20)))
-    alpha = 255
-    draw.ellipse(
-        [center - i, center - i, center + i, center + i],
-        fill=(r, g, b, alpha),
+def make_icon(filename: str, badge: tuple | None = None):
+    s = 128  # retina size
+    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    m = s / 64
+
+    # Cerchio sfondo blu
+    cx, cy = s // 2, s // 2
+    r = s // 2 - 2
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(59, 130, 246, 255))
+
+    # Microfono bianco
+    mic_w = 7 * m
+    mic_h = 11 * m
+    hx, hy = cx, cy - 2 * m
+
+    # Corpo
+    draw.rounded_rectangle(
+        [hx - mic_w, hy - mic_h, hx + mic_w, hy + mic_h],
+        fill=(255, 255, 255, 255),
+        radius=1.5 * m,
+    )
+    # Capsula top
+    cap_w = mic_w + 1.5 * m
+    draw.rounded_rectangle(
+        [hx - cap_w, hy - mic_h - 4 * m, hx + cap_w, hy - mic_h + 1 * m],
+        fill=(255, 255, 255, 255),
+        radius=2.5 * m,
+    )
+    # Stand
+    sw = 2.5 * m
+    draw.rectangle(
+        [hx - sw, hy + mic_h, hx + sw, hy + mic_h + 6 * m],
+        fill=(255, 255, 255, 255),
+    )
+    # Arco base
+    draw.arc(
+        [hx - 10 * m, hy + mic_h, hx + 10 * m, hy + mic_h + 12 * m],
+        -60, 240,
+        fill=(255, 255, 255, 255),
+        width=int(2.5 * m),
     )
 
-# Microfono bianco
-m = size // 64  # multiplier
-cx = center
-cy = center - 3 * m
+    # Badge
+    if badge:
+        bx, by = s - 18, 18
+        draw.ellipse([bx - 10, by - 10, bx + 10, by + 10], fill=badge)
+        draw.ellipse([bx - 10, by - 10, bx + 10, by + 10], outline=(255, 255, 255, 255), width=2)
 
-# Corpo microfono
-body_w = 14 * m
-body_h = 24 * m
-draw.rounded_rectangle(
-    [cx - body_w, cy - body_h, cx + body_w, cy + body_h],
-    fill=(255, 255, 255, 255),
-    radius=3 * m,
-)
+    img.save(os.path.join(OUT, filename), "PNG")
+    print(f"  ✓ {filename}")
 
-# Capsula arrotondata in cima
-draw.rounded_rectangle(
-    [cx - body_w - 2 * m, cy - body_h - 8 * m, cx + body_w + 2 * m, cy - body_h],
-    fill=(255, 255, 255, 255),
-    radius=5 * m,
-)
-
-# Stand
-stand_w = 5 * m
-stand_h = 14 * m
-draw.rectangle(
-    [cx - stand_w, cy + body_h, cx + stand_w, cy + body_h + stand_h],
-    fill=(255, 255, 255, 255),
-)
-
-# Arco base
-base_y = cy + body_h + stand_h
-draw.arc(
-    [cx - 20 * m, base_y - 8 * m, cx + 20 * m, base_y + 8 * m],
-    -60, 240,
-    fill=(255, 255, 255, 255),
-    width=5 * m,
-)
-
-# Salva
-out = sys.argv[1] if len(sys.argv) > 1 else "icon.png"
-img.save(out, "PNG")
-print(f"Icona salvata: {out}")
+make_icon("icon.png")
+make_icon("icon_processing.png", badge=(251, 146, 60))  # arancione
+print("Done.")

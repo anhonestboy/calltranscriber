@@ -171,20 +171,28 @@ def compress_video(src: Path, dst: Path, ffmpeg_bin: str) -> bool:
 
 
 def process_video(video: Path, output_dir: Path, ffmpeg_bin: str, whisper_bin: str,
-                  model: Path, compress: bool, delete_original: bool):
+                  model: Path, compress: bool, delete_original: bool,
+                  on_start=None, on_done=None):
     global PROCESSING
     base = video.stem
     audio_path = output_dir / f"{base}_audio.wav"
     text_path = output_dir / f"{base}_trascrizione.txt"
     compressed_path = output_dir / f"{base}_compressed.mp4"
 
+    if on_start:
+        on_start()
+
     if not extract_audio(video, audio_path, ffmpeg_bin):
         PROCESSING = False
+        if on_done:
+            on_done(video.name, False)
         return
     log(f"   → {audio_path.name}")
 
     if not transcribe(audio_path, text_path, whisper_bin, model):
         PROCESSING = False
+        if on_done:
+            on_done(video.name, False)
         return
     log(f"   → {text_path.name}")
 
@@ -200,10 +208,13 @@ def process_video(video: Path, output_dir: Path, ffmpeg_bin: str, whisper_bin: s
 
     log(f"✅ Completato: {video.name}")
     PROCESSING = False
+    if on_done:
+        on_done(video.name, True)
 
 
 def queue_worker(ffmpeg_bin: str, whisper_bin: str, model: Path,
-                 output_dir: Path, compress: bool, delete_original: bool):
+                 output_dir: Path, compress: bool, delete_original: bool,
+                 on_start=None, on_done=None):
     global PROCESSING
     while True:
         with QUEUE_LOCK:
@@ -215,10 +226,13 @@ def queue_worker(ffmpeg_bin: str, whisper_bin: str, model: Path,
         if path:
             try:
                 process_video(path, output_dir, ffmpeg_bin, whisper_bin,
-                            model, compress, delete_original)
+                            model, compress, delete_original,
+                            on_start=on_start, on_done=on_done)
             except Exception as e:
                 log(f"💥 Errore: {e}")
                 PROCESSING = False
+                if on_done:
+                    on_done(path.name, False)
         else:
             time.sleep(1)
 
@@ -246,41 +260,47 @@ class VideoHandler(FileSystemEventHandler):
                 log(f"📥 Nuovo: {path.name}")
 
 
-# ── ICON GENERATION ──────────────────────────────
-def ensure_icon() -> Path:
-    """Genera un'icona PNG per la menu bar se non esiste."""
-    icon_dir = MODEL_DIR.parent  # ~/.calltranscriber/
-    icon_path = icon_dir / "icon.png"
-    if icon_path.exists():
-        return icon_path
+# ── ICONS ────────────────────────────────────────
+def icon_dir() -> Path:
+    return Path.home() / ".calltranscriber"
 
-    try:
-        from PIL import Image, ImageDraw
-        img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        # Cerchio blu scuro
-        draw.ellipse([4, 4, 60, 60], fill=(30, 64, 175, 255))
-        # Microfono bianco stilizzato
-        draw.rectangle([26, 12, 38, 36], fill=(255, 255, 255, 255))
-        draw.pieslice([22, 8, 42, 20], 180, 360, fill=(255, 255, 255, 255))
-        draw.rectangle([26, 36, 30, 48], fill=(255, 255, 255, 255))
-        draw.arc([14, 42, 50, 58], 60, 300, fill=(255, 255, 255, 255), width=4)
-        img.save(icon_path, "PNG")
-        log("🎨 Icona generata")
-    except ImportError:
-        # Pillow non installato — crea una PNG minimale (pixel azzurro 1x1)
-        b = bytes([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
-                   0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222,
-                   0, 0, 0, 12, 73, 68, 65, 84, 8, 215, 99, 96, 96, 96, 0, 0,
-                   0, 4, 0, 1, 39, 221, 37, 58, 0, 0, 0, 0, 73, 69, 78, 68,
-                   174, 66, 96, 130])
-        icon_path.write_bytes(b)
-    return icon_path
+
+def resource_path(filename: str) -> Path:
+    """Path a un file di risorsa (funziona sia in dev che in PyInstaller)."""
+    if getattr(sys, "frozen", False):
+        # PyInstaller bundle
+        base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    else:
+        base = Path(__file__).parent
+    return base / filename
+
+
+def ensure_icons() -> tuple[Path, Path]:
+    """Copia le icone nella user dir se non esistono. Ritorna (idle, processing)."""
+    d = icon_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    idle = d / "icon.png"
+    processing = d / "icon_processing.png"
+
+    for name, dest in [("icon.png", idle), ("icon_processing.png", processing)]:
+        if not dest.exists():
+            try:
+                src = resource_path(name)
+                if src.exists():
+                    shutil.copy2(src, dest)
+                else:
+                    # fallback: genera con lo script
+                    log(f"⚠️ Icona {name} non trovata, la genero...")
+            except Exception:
+                pass
+
+    return idle, processing
 
 
 # ── MENU BAR APP ─────────────────────────────────
 class CallTranscriberApp(rumps.App):
-    def __init__(self, ffmpeg_bin: str, whisper_bin: str, model: Path, icon: Path):
+    def __init__(self, ffmpeg_bin: str, whisper_bin: str, model: Path,
+                 icon_idle: Path, icon_processing: Path):
         self.ffmpeg_bin = ffmpeg_bin
         self.whisper_bin = whisper_bin
         self.model = model
@@ -289,12 +309,13 @@ class CallTranscriberApp(rumps.App):
         self.delete_original = False
         self.observer: Observer | None = None
         self._monitoring = False
-        self.icon_path = icon
+        self._icon_idle = str(icon_idle)
+        self._icon_processing = str(icon_processing)
 
         super().__init__(
             APP_NAME,
             title="",   # nessun testo nella menu bar, solo icona
-            icon=str(icon),
+            icon=self._icon_idle,
             quit_button=None,
         )
 
@@ -327,6 +348,18 @@ class CallTranscriberApp(rumps.App):
         ]
         self._update_folder_display()
         self._update_option_titles()
+
+    def set_processing(self):
+        self.icon = self._icon_processing
+
+    def set_idle(self):
+        self.icon = self._icon_idle
+
+    def notify(self, title: str, subtitle: str = "", message: str = ""):
+        try:
+            rumps.notification(title=title, subtitle=subtitle, message=message)
+        except Exception:
+            pass  # notifiche disabilitate o non autorizzate
 
     def _output_dir(self) -> Path:
         p = Path(self.watch_folder) / "output"
@@ -371,9 +404,21 @@ class CallTranscriberApp(rumps.App):
     def start_monitoring(self):
         log(f"🔍 Monitoraggio: {self.watch_folder}")
         output_dir = self._output_dir()
+
+        def on_start():
+            self.set_processing()
+
+        def on_done(name: str, success: bool):
+            self.set_idle()
+            if success:
+                self.notify("Trascrizione completata", name)
+            else:
+                self.notify("Errore", name, "Controlla i log per dettagli")
+
         Thread(target=queue_worker, args=(
             self.ffmpeg_bin, self.whisper_bin, self.model,
-            output_dir, self.compress_video, self.delete_original
+            output_dir, self.compress_video, self.delete_original,
+            on_start, on_done
         ), daemon=True).start()
         self.observer = Observer()
         self.observer.schedule(VideoHandler(), self.watch_folder, recursive=False)
@@ -433,10 +478,10 @@ def main():
         debug_log(f"ffmpeg: {ffp}")
         debug_log(f"whisper: {whp}")
 
-        # Icona
-        debug_log("Creo icona...")
-        icon = ensure_icon()
-        debug_log(f"Icona: {icon}")
+        # Icone
+        debug_log("Carico icone...")
+        icon_idle, icon_processing = ensure_icons()
+        debug_log(f"Icone: {icon_idle}, {icon_processing}")
 
         # Scarica modello
         debug_log("Verifico modello...")
@@ -449,7 +494,8 @@ def main():
 
         # Avvia app
         debug_log("Avvio rumps...")
-        app = CallTranscriberApp(ffmpeg_bin=ffp, whisper_bin=whp, model=model, icon=icon)
+        app = CallTranscriberApp(ffmpeg_bin=ffp, whisper_bin=whp, model=model,
+                                icon_idle=icon_idle, icon_processing=icon_processing)
         debug_log("run()...")
         app.run()
     except Exception as e:
