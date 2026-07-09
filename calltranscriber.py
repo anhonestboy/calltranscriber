@@ -41,15 +41,21 @@ def log(msg: str):
 
 
 def find_binary(names: list[str]) -> str | None:
+    # Aggiungi percorsi Homebrew al PATH (Finder non li eredita)
+    os.environ["PATH"] = os.environ.get("PATH", "/usr/bin:/bin") + \
+        ":/opt/homebrew/bin:/usr/local/bin"
+
     for name in names:
-        # brew --prefix name
-        r = subprocess.run(["brew", "--prefix", name], capture_output=True, text=True)
-        if r.returncode == 0:
-            prefix = r.stdout.strip()
-            for variant in [name, name.replace("-cpp", ""), name.replace("-cli", ""), "whisper-cli"]:
-                candidate = os.path.join(prefix, "bin", variant)
-                if os.path.isfile(candidate):
-                    return candidate
+        # Prova brew --prefix con path assoluti
+        for brew_bin in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew", "brew"]:
+            r = subprocess.run([brew_bin, "--prefix", name], capture_output=True, text=True)
+            if r.returncode == 0:
+                prefix = r.stdout.strip()
+                for variant in [name, name.replace("-cpp", ""), name.replace("-cli", ""), "whisper-cli"]:
+                    candidate = os.path.join(prefix, "bin", variant)
+                    if os.path.isfile(candidate):
+                        return candidate
+                break  # prefix trovato, non provare altri brew_bin
         # shutil.which
         p = shutil.which(name)
         if p:
