@@ -283,16 +283,15 @@ def ensure_icons() -> tuple[Path, Path]:
     processing = d / "icon_processing.png"
 
     for name, dest in [("icon.png", idle), ("icon_processing.png", processing)]:
-        if not dest.exists():
-            try:
-                src = resource_path(name)
-                if src.exists():
-                    shutil.copy2(src, dest)
-                else:
-                    # fallback: genera con lo script
-                    log(f"⚠️ Icona {name} non trovata, la genero...")
-            except Exception:
-                pass
+        try:
+            src = resource_path(name)
+            if src.exists():
+                # Copia sempre — così gli aggiornamenti alle icone vengono applicati
+                shutil.copy2(src, dest)
+            else:
+                log(f"⚠️ Icona {name} non trovata nel bundle")
+        except Exception as e:
+            log(f"⚠️ Errore copia icona {name}: {e}")
 
     return idle, processing
 
