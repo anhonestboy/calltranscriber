@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+
+# Build
+dist/
+build/
+*.spec
+
+# Model files (too large for git)
+models/
+*.bin
+*.tmp
+
+# IDE
+.vscode/
+.idea/
