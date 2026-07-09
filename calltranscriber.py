@@ -292,8 +292,8 @@ class CallTranscriberApp(rumps.App):
         self.icon_path = icon
 
         super().__init__(
-            name=APP_NAME,
-            title=None,  # nessun testo nella menu bar
+            APP_NAME,
+            title="",   # nessun testo nella menu bar, solo icona
             icon=str(icon),
             quit_button=None,
         )

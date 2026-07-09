@@ -47,8 +47,17 @@ pyinstaller \
     --name "$APP_NAME" \
     --icon icon.icns \
     --add-data "icon.png:." \
+    --osx-bundle-identifier com.calltranscriber.app \
     --clean \
     calltranscriber.py
+
+# Aggiungi LSUIElement (solo menu bar, niente dock)
+echo "🔧 Imposto LSUIElement=true..."
+/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "dist/$APP_NAME.app/Contents/Info.plist" 2>/dev/null || \
+/usr/libexec/PlistBuddy -c "Set :LSUIElement true" "dist/$APP_NAME.app/Contents/Info.plist"
+
+# Fix permessi app bundle
+chmod -R +r "dist/$APP_NAME.app"
 
 echo ""
 echo "✅ Build completata!"
