@@ -405,31 +405,58 @@ class CallTranscriberApp(rumps.App):
 
 # ── MAIN ─────────────────────────────────────────
 def main():
-    # Verifica dipendenze
-    ffp = find_binary(["ffmpeg"])
-    whp = find_binary(["whisper-cpp", "whisper-cli", "whisper"])
-    if not ffp:
-        print("❌ ffmpeg non trovato. Installa: brew install ffmpeg")
-        sys.exit(1)
-    if not whp:
-        print("❌ whisper-cpp non trovato. Installa: brew install whisper-cpp")
-        sys.exit(1)
-    log(f"ffmpeg: {ffp}")
-    log(f"whisper: {whp}")
+    # Log su file per debug bundle PyInstaller
+    log_dir = Path.home() / ".calltranscriber"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "debug.log"
 
-    # Scarica modello (se necessario)
-    model = ensure_model()
-    if not model:
-        log("❌ Impossibile scaricare il modello whisper.")
-        rumps.alert("Errore", "Impossibile scaricare il modello whisper.\nControlla la connessione e riprova.")
-        sys.exit(1)
+    def debug_log(msg: str):
+        ts = datetime.now().strftime("%H:%M:%S")
+        with open(log_path, "a") as f:
+            f.write(f"[{ts}] {msg}\n")
+        print(msg)
 
-    # Icona
-    icon = ensure_icon()
+    try:
+        debug_log("Avvio...")
 
-    # Avvia app
-    app = CallTranscriberApp(ffmpeg_bin=ffp, whisper_bin=whp, model=model, icon=icon)
-    app.run()
+        # Verifica dipendenze
+        ffp = find_binary(["ffmpeg"])
+        whp = find_binary(["whisper-cpp", "whisper-cli", "whisper"])
+        if not ffp:
+            debug_log("❌ ffmpeg non trovato")
+            rumps.alert("Errore", "ffmpeg non trovato.\nInstalla: brew install ffmpeg")
+            sys.exit(1)
+        if not whp:
+            debug_log("❌ whisper non trovato")
+            rumps.alert("Errore", "whisper-cpp non trovato.\nInstalla: brew install whisper-cpp")
+            sys.exit(1)
+        debug_log(f"ffmpeg: {ffp}")
+        debug_log(f"whisper: {whp}")
+
+        # Icona
+        debug_log("Creo icona...")
+        icon = ensure_icon()
+        debug_log(f"Icona: {icon}")
+
+        # Scarica modello
+        debug_log("Verifico modello...")
+        model = ensure_model()
+        if not model:
+            debug_log("❌ modello non disponibile")
+            rumps.alert("Errore", "Impossibile scaricare il modello whisper.")
+            sys.exit(1)
+        debug_log(f"Modello: {model}")
+
+        # Avvia app
+        debug_log("Avvio rumps...")
+        app = CallTranscriberApp(ffmpeg_bin=ffp, whisper_bin=whp, model=model, icon=icon)
+        debug_log("run()...")
+        app.run()
+    except Exception as e:
+        debug_log(f"💥 CRASH: {e}")
+        import traceback
+        debug_log(traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
