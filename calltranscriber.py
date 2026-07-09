@@ -328,11 +328,11 @@ class CallTranscriberApp(rumps.App):
         from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
         NSApplication.sharedApplication().setActivationPolicy_(NSApplicationActivationPolicyAccessory)
 
-        self.folder_item = rumps.MenuItem("📂 Cartella: …")
+        self.folder_item = rumps.MenuItem("Cartella: …")
         self.toggle_item = rumps.MenuItem("Avvia monitoraggio")
-        self.status_item = rumps.MenuItem("Stato: ⏸️ fermo")
-        self.compress_item = rumps.MenuItem("✅ Comprimi video")
-        self.delete_item = rumps.MenuItem("☐ Elimina originale")
+        self.status_item = rumps.MenuItem("Stato: fermo")
+        self.compress_item = rumps.MenuItem("Comprimi video")
+        self.delete_item = rumps.MenuItem("Elimina originale")
         self.folder_item.set_callback(self.choose_folder)
         self.toggle_item.set_callback(self.toggle_monitoring)
         self.compress_item.set_callback(self.toggle_compress)
@@ -344,9 +344,9 @@ class CallTranscriberApp(rumps.App):
             self.toggle_item,
             self.status_item,
             None,
-            rumps.MenuItem("📋 Ultimi log", callback=self.show_logs),
+            rumps.MenuItem("Ultimi log", callback=self.show_logs),
             None,
-            "⚙️ Opzioni",
+            "Opzioni",
             self.compress_item,
             self.delete_item,
             None,
@@ -375,11 +375,11 @@ class CallTranscriberApp(rumps.App):
         return p
 
     def _update_folder_display(self):
-        self.folder_item.title = f"📂 {self.watch_folder}"
+        self.folder_item.title = f"Cartella: {self.watch_folder}"
 
     def _update_option_titles(self):
-        self.compress_item.title = "✅ Comprimi video" if self.compress_video else "☐ Comprimi video"
-        self.delete_item.title = "✅ Elimina originale" if self.delete_original else "☐ Elimina originale"
+        self.compress_item.title = "Comprimi video  ✓" if self.compress_video else "Comprimi video"
+        self.delete_item.title = "Elimina originale  ✓" if self.delete_original else "Elimina originale"
 
     def choose_folder(self, _):
         from AppKit import NSOpenPanel
@@ -433,7 +433,7 @@ class CallTranscriberApp(rumps.App):
         self.observer.start()
         self._monitoring = True
         self.toggle_item.title = "Ferma monitoraggio"
-        self.status_item.title = "Stato: ▶️ attivo"
+        self.status_item.title = "Stato: attivo"
 
     def stop_monitoring(self):
         if self.observer:
@@ -442,7 +442,7 @@ class CallTranscriberApp(rumps.App):
             self.observer = None
         self._monitoring = False
         self.toggle_item.title = "Avvia monitoraggio"
-        self.status_item.title = "Stato: ⏸️ fermo"
+        self.status_item.title = "Stato: fermo"
         log("⏸️ Monitoraggio fermato")
 
     def show_logs(self, _):
