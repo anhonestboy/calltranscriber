@@ -311,6 +311,7 @@ class CallTranscriberApp(rumps.App):
         self._monitoring = False
         self._icon_idle = str(icon_idle)
         self._icon_processing = str(icon_processing)
+        self._processing_flag = False
 
         super().__init__(
             APP_NAME,
@@ -349,17 +350,19 @@ class CallTranscriberApp(rumps.App):
         self._update_folder_display()
         self._update_option_titles()
 
-    def set_processing(self):
-        self.icon = self._icon_processing
-
-    def set_idle(self):
-        self.icon = self._icon_idle
+    @rumps.timer(1)
+    def _sync_icon(self, _):
+        """Timer: aggiorna l'icona sul main thread in base allo stato."""
+        if self._processing_flag and self.icon != self._icon_processing:
+            self.icon = self._icon_processing
+        elif not self._processing_flag and self.icon != self._icon_idle:
+            self.icon = self._icon_idle
 
     def notify(self, title: str, subtitle: str = "", message: str = ""):
         try:
             rumps.notification(title=title, subtitle=subtitle, message=message)
         except Exception:
-            pass  # notifiche disabilitate o non autorizzate
+            pass
 
     def _output_dir(self) -> Path:
         p = Path(self.watch_folder) / "output"
@@ -406,10 +409,10 @@ class CallTranscriberApp(rumps.App):
         output_dir = self._output_dir()
 
         def on_start():
-            self.set_processing()
+            self._processing_flag = True
 
         def on_done(name: str, success: bool):
-            self.set_idle()
+            self._processing_flag = False
             if success:
                 self.notify("Trascrizione completata", name)
             else:
